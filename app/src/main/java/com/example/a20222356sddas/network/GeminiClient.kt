@@ -17,9 +17,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import com.example.a20222356sddas.BuildConfig
 import kotlin.math.abs
 
 object GeminiClient {
+    private val EMBEDDED_API_KEY = BuildConfig.GEMINI_API_KEY
 
     /**
      * Performs PII masking on user data prior to sending it to the API.
@@ -41,7 +43,8 @@ object GeminiClient {
      * Calls Gemini API via HttpURLConnection.
      */
     private suspend fun callGeminiApi(prompt: String, apiKey: String): String = withContext(Dispatchers.IO) {
-        val urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
+        val activeKey = apiKey.ifEmpty { EMBEDDED_API_KEY }
+        val urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$activeKey"
         var connection: HttpURLConnection? = null
         try {
             val url = URL(urlString)
@@ -160,8 +163,9 @@ object GeminiClient {
 
         val maskedPrompt = maskPII(prompt, userName)
 
-        if (apiKey.isNotEmpty()) {
-            val response = callGeminiApi(maskedPrompt, apiKey)
+        val activeKey = apiKey.ifEmpty { EMBEDDED_API_KEY }
+        if (activeKey.isNotEmpty()) {
+            val response = callGeminiApi(maskedPrompt, activeKey)
             if (!response.contains("에러 코드") && !response.contains("네트워크 오류")) {
                 return response
             }
@@ -213,8 +217,9 @@ object GeminiClient {
 
         val maskedPrompt = maskPII(prompt, userName)
 
-        if (apiKey.isNotEmpty()) {
-            val response = callGeminiApi(maskedPrompt, apiKey)
+        val activeKey = apiKey.ifEmpty { EMBEDDED_API_KEY }
+        if (activeKey.isNotEmpty()) {
+            val response = callGeminiApi(maskedPrompt, activeKey)
             if (!response.contains("에러") && !response.contains("오류")) {
                 return response
             }
@@ -242,7 +247,8 @@ object GeminiClient {
         val absWeeklyChange = abs(weeklyChange)
 
         // API Key logic (Ask Gemini if the goal is healthy)
-        if (apiKey.isNotEmpty()) {
+        val activeKey = apiKey.ifEmpty { EMBEDDED_API_KEY }
+        if (activeKey.isNotEmpty()) {
             val prompt = """
                 체중 조절 목표의 건강상 적합성 여부를 판단해 주세요.
                 현재 체중: $currentWeight kg
@@ -256,7 +262,7 @@ object GeminiClient {
                 만약 매우 건강하고 무난한 계획이라면 "SAFE" 라고만 답변해 주세요.
             """.trimIndent()
             val maskedPrompt = maskPII(prompt, userName)
-            val response = callGeminiApi(maskedPrompt, apiKey)
+            val response = callGeminiApi(maskedPrompt, activeKey)
             if (!response.contains("에러") && !response.contains("오류")) {
                 val cleanResponse = response.trim()
                 if (cleanResponse.uppercase().contains("SAFE") && cleanResponse.length < 10) {
@@ -291,7 +297,8 @@ object GeminiClient {
     ): List<TodoItem> {
         val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-        if (apiKey.isNotEmpty()) {
+        val activeKey = apiKey.ifEmpty { EMBEDDED_API_KEY }
+        if (activeKey.isNotEmpty()) {
             val currentWeight = latestRecord?.weight ?: 70.0
             val goalWeight = goal.targetWeight
             val direction = if (goalWeight >= currentWeight) "벌크업/근육량 증가" else "다이어트/체지방 감소"
@@ -307,7 +314,7 @@ object GeminiClient {
                   {"title": "식단 항목 내용 3", "category": "식단"}
                 ]
             """.trimIndent()
-            val response = callGeminiApi(maskPII(prompt, userName), apiKey)
+            val response = callGeminiApi(maskPII(prompt, userName), activeKey)
             try {
                 // Strip markdown fence if Gemini returns it
                 var cleanJson = response.trim()

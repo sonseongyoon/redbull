@@ -26,8 +26,6 @@ fun SettingsScreen(
     onThemeChange: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // API Key State
-    var apiKeyInput by remember { mutableStateOf(prefs.geminiApiKey) }
 
     // Security PIN State
     var pinEnabled by remember { mutableStateOf(prefs.isPinEnabled) }
@@ -155,44 +153,6 @@ fun SettingsScreen(
                     if (saveProfileSuccess) {
                         Text("신체 정보 프로필이 업데이트되었습니다.", color = Color(0xFF4CAF50), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
-                }
-            }
-
-            // 2. Gemini API Key Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text("Gemini API 키 관리", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    }
-                    Text(
-                        "제미나이 API 키를 설정하면 로컬 인바디 지표 변화를 기반으로 생성형 AI 피드백 및 건강 상담을 실시간으로 수신합니다. 입력하지 않을 경우 고화질 AI 시뮬레이터가 동작합니다.",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 16.sp
-                    )
-
-                    OutlinedTextField(
-                        value = apiKeyInput,
-                        onValueChange = {
-                            apiKeyInput = it
-                            prefs.geminiApiKey = it.trim()
-                        },
-                        label = { Text("Gemini API Key") },
-                        placeholder = { Text("AIzaSy...") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
 

@@ -74,8 +74,7 @@ fun ChatScreen(
                             )
                             Column {
                                 Text("Gemini AI 건강 상담소", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color.White)
-                                val status = if (prefs.geminiApiKey.isNotEmpty()) "실시간 연동 모드" else "가상 시뮬레이션 모드"
-                                Text(status, fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
+                                Text("실시간 건강 조언 & 식단 상담", fontSize = 10.sp, color = Color.White.copy(alpha = 0.8f))
                             }
                         }
                     },
