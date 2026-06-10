@@ -12,7 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Brush
@@ -29,6 +29,12 @@ import com.example.a20222356sddas.data.PreferencesManager
 import com.example.a20222356sddas.network.GeminiClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +48,12 @@ fun ChatScreen(
     var isThinking by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
+
+    val quickPrompts = listOf(
+        "🏋️‍♂️ 오늘 맞춤 루틴 짜줘!" to "오늘 제가 할 수 있는 1:1 맞춤형 근력 운동 루틴을 추천해 주세요! 세트수와 횟수도 알려주세요.",
+        "🥗 탄단지 식단 비율 추천" to "제 인바디 상태를 고려했을 때, 하루에 섭취해야 할 탄수화물, 단백질, 지방의 비율과 추천 식단 가이드를 알려주세요.",
+        "📈 인바디 분석 및 목표 팁" to "제 최근 인바디 변화 추이를 종합적으로 분석해 주시고, 앞으로 운동 방향성에 대한 PT 조언 부탁드려요!"
+    )
 
     // Auto-scroll to bottom when messages list size changes
     LaunchedEffect(chatMessages.size, isThinking) {
@@ -171,6 +183,61 @@ fun ChatScreen(
                 }
             }
 
+            // Quick Suggestion Chips Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                for ((label, promptText) in quickPrompts) {
+                    AssistChip(
+                        onClick = {
+                            if (!isThinking) {
+                                val userMsg = ChatMessage(text = label, isUser = true)
+                                prefs.addChatMessage(userMsg)
+                                chatMessages = prefs.getChatMessages()
+
+                                coroutineScope.launch {
+                                    isThinking = true
+                                    delay(1000)
+                                    val records = prefs.getInbodyRecords()
+                                    val replyText = GeminiClient.sendChatMessage(
+                                        chatHistory = chatMessages,
+                                        currentMessage = promptText,
+                                        allRecords = records,
+                                        apiKey = prefs.geminiApiKey,
+                                        userName = prefs.userName,
+                                        gender = prefs.userGender,
+                                        height = prefs.userHeight,
+                                        age = prefs.userAge
+                                    )
+                                    val aiMsg = ChatMessage(text = replyText, isUser = false)
+                                    prefs.addChatMessage(aiMsg)
+                                    chatMessages = prefs.getChatMessages()
+                                    isThinking = false
+                                }
+                            }
+                        },
+                        label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                        enabled = !isThinking,
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        ),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = if (!isThinking) {
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            } else {
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.1f)
+                            }
+                        )
+                    )
+                }
+            }
+
             // Input Panel
             Card(
                 modifier = Modifier
@@ -218,7 +285,7 @@ fun ChatScreen(
                                     val replyText = GeminiClient.sendChatMessage(
                                         chatHistory = chatMessages,
                                         currentMessage = msgText,
-                                        latestRecord = records.lastOrNull(),
+                                        allRecords = records,
                                         apiKey = prefs.geminiApiKey,
                                         userName = prefs.userName,
                                         gender = prefs.userGender,
@@ -245,13 +312,28 @@ fun ChatScreen(
                             )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Send,
+                            imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "전송",
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+fun parseMarkdownToAnnotatedString(text: String): AnnotatedString {
+    return buildAnnotatedString {
+        val parts = text.split("**")
+        for (i in parts.indices) {
+            if (i % 2 == 1) {
+                withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                    append(parts[i])
+                }
+            } else {
+                append(parts[i])
             }
         }
     }
@@ -285,7 +367,7 @@ fun ChatBubble(message: ChatMessage) {
                 .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
-                text = message.text,
+                text = parseMarkdownToAnnotatedString(message.text),
                 color = contentColor,
                 fontSize = 13.sp,
                 lineHeight = 18.sp
@@ -309,7 +391,7 @@ fun TypingIndicatorBubble() {
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Circular pulsating dots simulation
@@ -333,6 +415,14 @@ fun TypingIndicatorBubble() {
                             .background(MaterialTheme.colorScheme.primary.copy(alpha = scale))
                     )
                 }
+
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    text = "PT 트레이너 분석 중...",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }

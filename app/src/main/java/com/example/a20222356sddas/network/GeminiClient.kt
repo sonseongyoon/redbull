@@ -181,38 +181,52 @@ object GeminiClient {
     suspend fun sendChatMessage(
         chatHistory: List<ChatMessage>,
         currentMessage: String,
-        latestRecord: InbodyRecord?,
+        allRecords: List<InbodyRecord>,
         apiKey: String,
         userName: String,
         gender: String,
         height: Double,
         age: Int
     ): String {
-        val inbodyContext = if (latestRecord != null) {
-            "사용자의 최근 인바디 상태: 체중 ${latestRecord.weight}kg, 골격근량 ${latestRecord.skeletalMuscleMass}kg, 체지방률 ${latestRecord.bodyFatPercentage}%"
+        val inbodyContext = if (allRecords.isNotEmpty()) {
+            val first = allRecords.first()
+            val latest = allRecords.last()
+            val weightDiff = latest.weight - first.weight
+            val muscleDiff = latest.skeletalMuscleMass - first.skeletalMuscleMass
+            val fatDiff = latest.bodyFatPercentage - first.bodyFatPercentage
+            """
+            [회원 인바디 상태 및 변화 추이]
+            - 최초 측정일(${formatDate(first.date)}): 체중 ${first.weight}kg, 골격근량 ${first.skeletalMuscleMass}kg, 체지방률 ${first.bodyFatPercentage}%
+            - 최근 측정일(${formatDate(latest.date)}): 체중 ${latest.weight}kg, 골격근량 ${latest.skeletalMuscleMass}kg, 체지방률 ${latest.bodyFatPercentage}%
+            - 측정치 총 변화량: 체중 ${String.format("%.1f", weightDiff)}kg, 골격근량 ${String.format("%.1f", muscleDiff)}kg, 체지방률 ${String.format("%.1f", fatDiff)}%
+            """.trimIndent()
         } else {
             "사용자의 인바디 기록이 아직 없습니다."
         }
 
         val historyPrompt = chatHistory.takeLast(10).joinToString("\n") {
-            if (it.isUser) "질문: ${it.text}" else "답변: ${it.text}"
+            if (it.isUser) "회원: ${it.text}" else "트레이너: ${it.text}"
         }
 
         val prompt = """
-            당신은 친절하고 전문적인 생성형 AI 건강/피트니스 컨설팅 챗봇입니다.
-            사용자의 신체 정보를 기반으로 식단 및 운동 질문에 유익하고 직관적인 답변을 제공해 주세요.
+            당신은 회원님의 건강을 끝까지 책임지는 열정적이고 전문적인 1:1 퍼스널 트레이너(PT) 선생님입니다.
+            다음 지침에 맞춰 회원님의 건강/식단/운동 질문에 답변해 주세요:
             
-            [사용자 기본 정보]
+            1. **어조**: 항상 친절하고 에너지가 넘치며, 질문자인 사용자를 반드시 "회원님!" 또는 "회원님,"으로 지칭하세요. 격려와 칭찬을 아끼지 않는 든든한 PT 쌤의 느낌을 주어야 합니다.
+            2. **개인화**: 회원님의 기본 정보와 인바디 추세 변화 정보를 적극적으로 참고하여 맞춤형으로 이야기하세요. (예: "회원님, 이전보다 골격근이 0.5kg 느셨으니 지금처럼 하시면 됩니다!")
+            3. **답변 구성**: 운동 루틴이나 식단 추천을 요구할 때는 단계를 나누어 번호 매김이나 글머리 기호(마크다운 굵은 글씨 등)를 사용하여 매우 직관적이고 알아보기 쉽게 작성해 주세요. (예: **1. 스쿼트**: 4세트 x 12회)
+            4. **길이 제한**: 350자 내외로 핵심만 짚어서 전달하세요.
+            
+            [회원 기본 프로필]
             성별: $gender, 나이: ${age}세, 키: $height cm
+            
             $inbodyContext
             
             [이전 대화 기록]
             $historyPrompt
             
-            [현재 질문]
+            [회원의 현재 질문]
             $currentMessage
-            
-            답변은 친절하게 200자 내외로 작성해 주시고 핵심 요점(단백질 섭취량 계산, 권장 루틴 등)을 구체적인 숫자로 표시해 주세요.
         """.trimIndent()
 
         val maskedPrompt = maskPII(prompt, userName)
@@ -225,6 +239,7 @@ object GeminiClient {
             }
         }
 
+        val latestRecord = allRecords.lastOrNull()
         return simulateChatResponse(currentMessage, latestRecord, gender, age, height)
     }
 
